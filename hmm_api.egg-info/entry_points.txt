@@ -1,0 +1,4 @@
+
+        [console_scripts]
+        hmm_api=hmm_api.cli:cli
+    

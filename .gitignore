@@ -1,0 +1,6 @@
+test.db
+*egg*
+build
+build/*
+dist
+dist/*
