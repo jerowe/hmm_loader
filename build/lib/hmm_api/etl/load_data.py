@@ -125,7 +125,7 @@ class HmmSearch(object):
         """ Iterate over the HSPs """
 
         for hsp in hsps:
-            self.create_hsp(hsp)
+            self.create_hsp(hsp, hit_id)
 
     # hsp_bias REAL,
     # hsp_bitscore REAL,
@@ -134,7 +134,7 @@ class HmmSearch(object):
     # hit_from INTEGER,
     # hit_to INTEGER,
     # query_to INTEGER,
-    def create_hsp(self, hsp):
+    def create_hsp(self, hsp, hit_id):
         """Create the HSP entry """
 
         bias = hsp.bias
@@ -150,7 +150,7 @@ class HmmSearch(object):
 
         try:
             i = self.sql.hsp.insert()
-            res = i.execute(hsp_bias = bias, hsp_bitscore = bitscore, hsp_evalue = evalue,
+            res = i.execute(hit_id = hit_id, hsp_bias = bias, hsp_bitscore = bitscore, hsp_evalue = evalue,
                     hsp_evalue_cond = evalue_cond, hit_from = hit_from,
                     hit_to = hit_to, hit_strand = hit_strand, query_from = query_from,
                     query_to = query_to, query_strand = query_strand)
