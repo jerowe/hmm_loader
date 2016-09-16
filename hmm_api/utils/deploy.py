@@ -81,7 +81,6 @@ class Deploy(object):
             hit_len INTEGER,
             hit_bitscore REAL,
             hit_evalue REAL,
-            UNIQUE(sample_id, hit_fullname, hit_name),
             FOREIGN KEY (sample_id) REFERENCES sample (sample_id)
         );
         ''')
