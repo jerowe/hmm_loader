@@ -16,7 +16,7 @@ class MyCLI(click.MultiCommand):
                     filename.startswith('cmd_'):
                         rv.append(filename[4:-3])
         rv.sort()
-        click.echo("RVS are {}".format(rv))
+        # click.echo("RVS are {}".format(rv))
         return rv
 
     def get_command(self, ctx, name):
@@ -39,21 +39,22 @@ class GlobalOpts(object):
                 ]
         self.etl_values = [
                 click.option('--sample', '-s', default=None,  help='Sample to query for'),
+                click.option('--dbfile', '-db', default=None, type=click.Path(exists=False), required=False,  help='Path to sqlitedb'),
                 ]
 
-    def global_test_options(self, func):
+    def global_options(self, func):
         for option in self.global_values:
             func = option(func)
         return func
 
-    def etl_test_options(self, func):
+    def etl_options(self, func):
         for option in self.etl_values:
             func = option(func)
         return func
 
 global_opts = GlobalOpts()
-global_test_options = global_opts.global_test_options
-etl_test_options = global_opts.etl_test_options
+global_options = global_opts.global_options
+etl_options = global_opts.etl_options
 
 @click.command(cls=MyCLI)
 def cli():

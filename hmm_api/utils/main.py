@@ -26,12 +26,14 @@ class HSP(object):
 class Conn(object):
     """ Connect to the DB using the SqlAlchemy DB """
 
-    def __init__(self, db_file='test.db'):
+    def __init__(self, db_file='hmm.db', drop=False):
         self.db_file = db_file
+        self.drop = drop
         self.sample = None
         self.query = None
         self.hit = None
         self.hsp = None
+
         self.map_meta()
 
     @property
@@ -52,7 +54,7 @@ class Conn(object):
         """ Ensure we have deployed the schema """
 
         #Change this to false when not testing
-        d = Deploy(self.db_file, True)
+        d = Deploy(self.db_file, self.drop)
         d.deploy_schema()
 
     def map_sample(self, metadata):
@@ -61,8 +63,9 @@ class Conn(object):
             sample  = Table('sample', metadata, autoload=True)
             mapper(Sample, sample)
             self.sample = sample
-        except:
-            pass
+        except Exception as e:
+            print("Exception mapping sample table {}".format(e))
+            raise
 
     def map_query(self, metadata):
 
@@ -70,8 +73,9 @@ class Conn(object):
             query  = Table('query', metadata, autoload=True)
             mapper(Query, query)
             self.query = query
-        except:
-            pass
+        except Exception as e:
+            print("Exception mapping query table {}".format(e))
+            raise
 
     def map_hit(self, metadata):
 
@@ -79,8 +83,9 @@ class Conn(object):
             hit  = Table('hit', metadata, autoload=True)
             mapper(Hit, hit)
             self.hit = hit
-        except:
-            pass
+        except Exception as e:
+            print("Exception mapping hit table {}".format(e))
+            raise
 
     def map_hsp(self, metadata):
 
@@ -88,8 +93,9 @@ class Conn(object):
             hsp  = Table('hsp', metadata, autoload=True)
             mapper(HSP, hsp)
             self.hsp = hsp
-        except:
-            pass
+        except Exception as e:
+            print("Exception mapping hsp table {}".format(e))
+            raise
 
     def map_meta(self):
         """ Map the table into the sqlalchemy expected classes """

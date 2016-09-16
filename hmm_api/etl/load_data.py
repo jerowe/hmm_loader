@@ -1,9 +1,9 @@
 from hmm_api.utils.main import Conn
 from Bio import SearchIO
 
-
 class HmmSearch(object):
     """ HMMSearch class - parse hmm file and add to the database
+    Optionally there is a field for sample_id
     1. Read in HMM file using Bio SearchIO
     2. Iterate over queries
     3. Iterate over hits
@@ -11,23 +11,50 @@ class HmmSearch(object):
     """
 
     def __init__(self,
-            search_file='/home/jillian/Dropbox/projects/'
-            'python/hmm_api/MWG01.TIGR00484.domtblout',
-            search_type='hmmsearch3-domtab'):
+            sample_name = None,
+            search_file = None,
+            db_file = 'hmm.db',
+            drop_db = False,
+            search_type = 'hmmsearch3-domtab'):
+
         self.searchio = SearchIO.parse(search_file, search_type)
-        self.sql = Conn()
+        self.db_file = db_file
+        self.sample_name = sample_name
         self.sample_id = None
 
-    def create_dummy_sample(self):
-        """ This is only here for testing purposes """
-        pass
+        self.sql = Conn(db_file, drop_db)
+        self.create_sample()
+
+    def create_sample(self):
+        """ Create a sample row """
+
+        if self.sample_name is None:
+            pass
+
+        trans = self.sql.connect.begin()
+
+        sname = self.sample_name
+        sample_id = self.find_sample()
+
+        if not sample_id:
+            try:
+                i = self.sql.sample.insert()
+                res = i.execute(sample_name = sname)
+                sample_id = res.lastrowid
+                trans.commit()
+            except Exception as e:
+                print("Exception {}".format(e))
+                trans.rollback()
+                raise
+
+        self.sample_id = sample_id
 
     ##TODO This should go someplace else
-    def find_sample(self, sname):
+    def find_sample(self):
         """ See if a sample name already exists """
 
         s = self.sql.sample.select()
-        res = s.where(self.sql.sample.c.sample_name == qname)
+        res = s.where(self.sql.sample.c.sample_name == self.sample_name)
         e = self.sql.connect.execute(res)
         row = e.fetchone()
 
@@ -51,7 +78,7 @@ class HmmSearch(object):
         query_id = self.find_query(qname)
 
         if query_id:
-            print('Query is id %s' % query_id)
+            # print('Query is id %s' % query_id)
             self.iter_hits(query_id, hits)
             pass
 
@@ -60,13 +87,8 @@ class HmmSearch(object):
             res = i.execute(query_len=qlen, query_name=qname)
             query_id = res.lastrowid
         except Exception as e:
-            if 'UNIQUE' in str(e):
-                #TODO Get the row id for this query name
-                pass
-            else:
-                #raise?
-                print(" We encountered an error! Error is {}".format(e))
-                pass
+            print(" We encountered an error! Error is {}".format(e))
+            pass
 
         self.iter_hits(query_id, hits)
 
@@ -110,11 +132,21 @@ class HmmSearch(object):
 
         hsps = hit.hsps
 
-        print("We are creating the hit %s" % fullname)
+        # print("We are creating the hit %s" % fullname)
 
         try:
             i = self.sql.hit.insert()
-            res = i.execute(hit_bitscore = bitscore, hit_evalue = evalue, hit_fullname = fullname, hit_len = slen, hit_frame = frame, hit_name = name)
+
+            if self.sample_id is None:
+                res = i.execute(hit_bitscore = bitscore,
+                        hit_evalue = evalue, hit_fullname = fullname,
+                        hit_len = slen, hit_frame = frame, hit_name = name)
+            else:
+                res = i.execute(sample_id = self.sample_id,
+                        hit_bitscore = bitscore, hit_evalue = evalue,
+                        hit_fullname = fullname, hit_len = slen,
+                        hit_frame = frame, hit_name = name)
+
             hit_id = res.lastrowid
         except Exception as e:
             print("We got an exception {}".format(str(e)))
@@ -155,6 +187,6 @@ class HmmSearch(object):
                     hit_to = hit_to, hit_strand = hit_strand, query_from = query_from,
                     query_to = query_to, query_strand = query_strand)
             hsp_id = res.lastrowid
-            print("HSP Id is {}".format(hsp_id))
+            # print("HSP Id is {}".format(hsp_id))
         except Exception as e:
             print("We got an exception {}".format(str(e)))

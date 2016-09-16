@@ -1,4 +1,6 @@
 test.db
+hmm.db
+*.db
 *egg*
 build
 build/*
