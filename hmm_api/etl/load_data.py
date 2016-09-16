@@ -12,18 +12,28 @@ class HmmSearch(object):
 
     def __init__(self,
             sample_name = None,
-            search_file = None,
+            search_files = [],
             db_file = 'hmm.db',
             drop_db = False,
             search_type = 'hmmsearch3-domtab'):
 
-        self.searchio = SearchIO.parse(search_file, search_type)
+        self.search_files = search_files
+        self.search_type = search_type
         self.db_file = db_file
         self.sample_name = sample_name
         self.sample_id = None
 
         self.sql = Conn(db_file, drop_db)
         self.create_sample()
+
+    def iter_results(self):
+        """ Iterate over the entire hmm file """
+
+        for search_file in self.search_files:
+            searchio = SearchIO.parse(search_file, self.search_type)
+
+            for qresult in searchio:
+                self.iter_queries(qresult)
 
     def create_sample(self):
         """ Create a sample row """
@@ -63,11 +73,6 @@ class HmmSearch(object):
         else:
             return False
 
-    def iter_results(self):
-        """ Iterate over the entire hmm file """
-
-        for qresult in self.searchio:
-            self.iter_queries(qresult)
 
     def iter_queries(self, qresult):
         """ Iterate over the queries """
