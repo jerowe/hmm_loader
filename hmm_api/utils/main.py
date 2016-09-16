@@ -44,11 +44,11 @@ class Conn(object):
     def connect(self):
         return self.engine.connect()
 
-    @property
-    def session(self):
-        Session = sessionmaker(bind=self.engine)
-        session = Session()
-        return session
+    # @property
+    # def session(self):
+        # Session = sessionmaker(bind=self.engine)
+        # session = Session()
+        # return session
 
     def ensure_deploy(self):
         """ Ensure we have deployed the schema """

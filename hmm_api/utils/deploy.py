@@ -8,6 +8,8 @@ class Deploy(object):
         self.db_file = db_file
         self.connect = sqlite3.connect(db_file)
 
+        self.deploy_schema()
+
     @property
     def cursor(self):
         return self.connect.cursor()
