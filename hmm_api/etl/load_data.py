@@ -1,5 +1,6 @@
-# from hmm_api.utils.main import Conn
+from hmm_api.utils.main import Conn
 from hmm_api.utils.deploy import Deploy
+import sqlite3
 from Bio import SearchIO
 
 class HmmSearch(object):
@@ -16,29 +17,44 @@ class HmmSearch(object):
             search_files = [],
             db_file = 'hmm.db',
             drop_db = False,
-            search_type = 'hmmsearch3-domtab'):
+            search_type = 'hmmsearch3-domtab',
+            db_drive  = 'sql'):
 
         self.search_files = search_files
         self.search_type = search_type
         self.db_file = db_file
+        self.db_drive = db_drive
         self.sample_name = sample_name
+
         self.sample_id = None
 
-        self.sql = Deploy(db_file, drop_db)
+        if db_drive == 'sql':
+            self.sql = Deploy(db_file, drop_db)
+            self.sql.connect.row_factory = sqlite3.Row
+        else:
+            self.sql = Conn(db_file, drop_db)
+
         self.create_sample()
 
     def iter_results(self):
         """ Iterate over the entire hmm file """
 
-        # trans = self.sql.connect.begin()
+        if self.db_drive == 'orm':
+            trans = self.sql.connect.begin()
+
         for search_file in self.search_files:
             searchio = SearchIO.parse(search_file, self.search_type)
 
             for qresult in searchio:
                 self.iter_queries(qresult)
 
-        self.sql.connect.commit()
-        # trans.commit()
+
+        if self.db_drive == 'orm':
+            trans.commit()
+        else:
+            self.sql.connect.commit()
+
+        self.sql.connect.close()
 
     def create_sample(self):
         """ Create a sample row """
@@ -46,18 +62,18 @@ class HmmSearch(object):
         if self.sample_name is None:
             pass
 
-
         sname = self.sample_name
         sample_id = self.find_sample()
 
         if not sample_id:
             try:
-                res = self.sql.cursor.execute('INSERT INTO sample (sample_name) VALUES (?)', [sname])
-                sample_id = res.lastrowid
+                if self.db_drive == 'sql':
+                    res = self.sql.cursor.execute('INSERT INTO sample (sample_name) VALUES (?)', [sname])
+                else:
+                    i = self.sql.sample.insert()
+                    res = i.execute(sample_name = sname)
 
-                # i = self.sql.sample.insert()
-                # res = i.execute(sample_name = sname)
-                # sample_id = res.lastrowid
+                sample_id = res.lastrowid
             except Exception as e:
                 print("Exception {}".format(e))
                 # trans.rollback()
@@ -70,18 +86,18 @@ class HmmSearch(object):
         """ See if a sample name already exists """
 
         # Sqlite
-        e = self.sql.cursor.execute('SELECT sample_id from sample WHERE sample_name = (?)', [self.sample_name])
+        if self.db_drive == 'sql':
+            e = self.sql.cursor.execute('SELECT sample_id from sample WHERE sample_name = (?)', [self.sample_name])
+        else:
+        # SqlAlchemy
+            s = self.sql.sample.select()
+            res = s.where(self.sql.sample.c.sample_name == self.sample_name)
+            e = self.sql.connect.execute(res)
+
         row = e.fetchone()
 
-        # SqlAlchemy
-        # s = self.sql.sample.select()
-        # res = s.where(self.sql.sample.c.sample_name == self.sample_name)
-        # e = self.sql.connect.execute(res)
-        # row = e.fetchone()
-
         if row:
-            # return row['sample_id']
-            row[0]
+            return row['sample_id']
         else:
             return False
 
@@ -94,20 +110,15 @@ class HmmSearch(object):
         hits = qresult.hits
         query_id = self.find_query(qname)
 
-        # if query_id:
-            # # print('Query is id %s' % query_id)
-            # self.iter_hits(query_id, hits)
-            # pass
-
         if not query_id:
             try:
                 # Sqlite
-                res = self.sql.cursor.execute('INSERT INTO query (query_name) VALUES (?)', [qname])
-
+                if self.db_drive == 'sql':
+                    res = self.sql.cursor.execute('INSERT INTO query (query_name, query_len) VALUES (?, ?)', [qname, qlen])
+                else:
                 # SqlAlchemy
-                # sample_id = res.lastrowid
-                # i = self.sql.query.insert()
-                # res = i.execute(query_len=qlen, query_name=qname)
+                    i = self.sql.query.insert()
+                    res = i.execute(query_len=qlen, query_name=qname)
 
                 query_id = res.lastrowid
             except Exception as e:
@@ -119,19 +130,18 @@ class HmmSearch(object):
     def find_query(self, qname):
         """ See if a query name already exists """
 
-        # SqlAlchemy
-        # s = self.sql.query.select()
-        # res = s.where(self.sql.query.c.query_name == qname)
-        # e = self.sql.connect.execute(res)
-        # row = e.fetchone()
-
         # Sqlite
-        e = self.sql.cursor.execute('SELECT query_id from query WHERE query_name = (?)', [qname])
-        row = e.fetchone()
+        if self.db_drive == 'sql':
+            e = self.sql.cursor.execute('SELECT query_id from query WHERE query_name = (?)', [qname])
+        else:
+        # SqlAlchemy
+            s = self.sql.query.select()
+            res = s.where(self.sql.query.c.query_name == qname)
+            e = self.sql.connect.execute(res)
 
+        row = e.fetchone()
         if row:
-            # return row['query_id']
-            return row[0]
+            return row['query_id']
         else:
             return False
 
@@ -159,24 +169,34 @@ class HmmSearch(object):
 
             if self.sample_id is None:
 
-                # SqlAlchemy
-                # i = self.sql.hit.insert()
-                # res = i.execute(hit_bitscore = bitscore,
-                        # hit_evalue = evalue, hit_fullname = fullname,
-                        # hit_len = slen, hit_frame = frame, hit_name = name)
-
                 # Sqlite
-                res = self.sql.cursor.execute('INSERT INTO hit (hit_bitscore, hit_evalue, hit_fullname, hit_len, hit_frame, hit_name) VALUES (?,?,?,?,?,?)', [bitscore, evalue, fullname, slen, frame, name])
+                if self.db_drive == 'sql':
+                    res = self.sql.cursor.execute('INSERT INTO hit (hit_bitscore,'
+                                                  ' hit_evalue, hit_fullname, hit_len,'
+                                                  ' hit_frame, hit_name) VALUES (?,?,?,?,?,?)',
+                                                  [bitscore, evalue, fullname, slen, frame, name])
+                else:
+                # SqlAlchemy
+                    i = self.sql.hit.insert()
+                    res = i.execute(hit_bitscore = bitscore,
+                            hit_evalue = evalue, hit_fullname = fullname,
+                            hit_len = slen, hit_frame = frame, hit_name = name)
+
             else:
-                # SqlAlchemy
-                # i = self.sql.hit.insert()
-                # res = i.execute(sample_id = self.sample_id,
-                        # hit_bitscore = bitscore, hit_evalue = evalue,
-                        # hit_fullname = fullname, hit_len = slen,
-                        # hit_frame = frame, hit_name = name)
-
+                if self.db_drive == 'sql':
                 # Sqlite
-                res = self.sql.cursor.execute('INSERT INTO hit (hit_bitscore, hit_evalue, hit_fullname, hit_len, hit_frame, hit_name, sample_id) VALUES (?,?,?,?,?,?,?)', [bitscore, evalue, fullname, slen, frame, name, self.sample_id])
+                    res = self.sql.cursor.execute(' INSERT INTO hit (hit_bitscore, '
+                                                  ' hit_evalue, hit_fullname, hit_len,'
+                                                  ' hit_frame, hit_name, sample_id) '
+                                                  ' VALUES (?,?,?,?,?,?,?) ',
+                                                  [bitscore, evalue, fullname, slen, frame, name, self.sample_id])
+                else:
+                # SqlAlchemy
+                    i = self.sql.hit.insert()
+                    res = i.execute(sample_id = self.sample_id,
+                            hit_bitscore = bitscore, hit_evalue = evalue,
+                            hit_fullname = fullname, hit_len = slen,
+                            hit_frame = frame, hit_name = name)
 
             hit_id = res.lastrowid
         except Exception as e:
@@ -205,18 +225,20 @@ class HmmSearch(object):
         query_strand = hsp.query_strand
 
         try:
-            # i = self.sql.hsp.insert()
-            # res = i.execute(hit_id = hit_id, hsp_bias = bias, hsp_bitscore = bitscore, hsp_evalue = evalue,
-                    # hsp_evalue_cond = evalue_cond, hit_from = hit_from,
-                    # hit_to = hit_to, hit_strand = hit_strand, query_from = query_from,
-                    # query_to = query_to, query_strand = query_strand)
 
-            res = self.sql.cursor.execute('INSERT INTO hsp (hit_id, hsp_bias,'
-                    'hsp_bitscore, hsp_evalue, hsp_evalue_cond, hit_from,   '
-                    'hit_to, hit_strand, query_from, query_to, query_strand) '
-                    'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                    [hit_id, bias, bitscore, evalue, evalue_cond, hit_from,
-                        hit_to, hit_strand, query_from, query_to, query_strand])
-            # hsp_id = res.lastrowid
+            if self.db_drive == 'sql':
+                self.sql.cursor.execute('INSERT INTO hsp (hit_id, hsp_bias,'
+                        'hsp_bitscore, hsp_evalue, hsp_evalue_cond, hit_from,   '
+                        'hit_to, hit_strand, query_from, query_to, query_strand) '
+                        'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                        [hit_id, bias, bitscore, evalue, evalue_cond, hit_from,
+                            hit_to, hit_strand, query_from, query_to, query_strand])
+            else:
+                i = self.sql.hsp.insert()
+                i.execute(hit_id = hit_id, hsp_bias = bias, hsp_bitscore = bitscore, hsp_evalue = evalue,
+                        hsp_evalue_cond = evalue_cond, hit_from = hit_from,
+                        hit_to = hit_to, hit_strand = hit_strand, query_from = query_from,
+                        query_to = query_to, query_strand = query_strand)
+
         except Exception as e:
             print("We got an exception {}".format(str(e)))

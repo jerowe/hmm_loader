@@ -76,6 +76,7 @@ class Deploy(object):
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS hit(
             hit_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            query_id INTEGER,
             sample_id INTEGER,
             hit_fullname TEXT,
             hit_name TEXT,
@@ -83,6 +84,7 @@ class Deploy(object):
             hit_len INTEGER,
             hit_bitscore REAL,
             hit_evalue REAL,
+            FOREIGN KEY (query_id) REFERENCES query (query_id),
             FOREIGN KEY (sample_id) REFERENCES sample (sample_id)
         );
         ''')
@@ -91,6 +93,9 @@ class Deploy(object):
         ''')
         self.cursor.execute('''
         CREATE INDEX IF NOT EXISTS Fhit_hit_sample ON hit (hit_id, sample_id);
+        ''')
+        self.cursor.execute('''
+        CREATE INDEX IF NOT EXISTS Fhit_hit_query ON hit (hit_id, query_id);
         ''')
         self.cursor.execute('''
         CREATE INDEX IF NOT EXISTS Fhit_hit_evalue ON hit (hit_id, hit_evalue);
