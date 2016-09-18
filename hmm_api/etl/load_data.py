@@ -149,9 +149,9 @@ class HmmSearch(object):
         """ Iterate over the hits """
 
         for hit in hits:
-            self.create_hit(hit)
+            self.create_hit(query_id, hit)
 
-    def create_hit(self, hit):
+    def create_hit(self, query_id, hit):
         """ Create the hit row in the DB """
 
         #TODO Add a find or create method
@@ -171,14 +171,14 @@ class HmmSearch(object):
 
                 # Sqlite
                 if self.db_drive == 'sql':
-                    res = self.sql.cursor.execute('INSERT INTO hit (hit_bitscore,'
+                    res = self.sql.cursor.execute('INSERT INTO hit (hit_bitscore, query_id,'
                                                   ' hit_evalue, hit_fullname, hit_len,'
-                                                  ' hit_frame, hit_name) VALUES (?,?,?,?,?,?)',
-                                                  [bitscore, evalue, fullname, slen, frame, name])
+                                                  ' hit_frame, hit_name) VALUES (?,?,?,?,?,?,?)',
+                                                  [bitscore, query_id, evalue, fullname, slen, frame, name])
                 else:
                 # SqlAlchemy
                     i = self.sql.hit.insert()
-                    res = i.execute(hit_bitscore = bitscore,
+                    res = i.execute(hit_bitscore = bitscore, query_id = query_id,
                             hit_evalue = evalue, hit_fullname = fullname,
                             hit_len = slen, hit_frame = frame, hit_name = name)
 
